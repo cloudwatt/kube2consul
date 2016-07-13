@@ -74,21 +74,18 @@ func (k2c *kube2consul) removeDeletedEndpoints(serviceName string, endpoints []E
 
 	// Remove all empty nodes
 	for nodeName := range updatedNodes {
-		if node, _, err := k2c.consulCatalog.Node(nodeName, nil); err == nil {
-			if len(node.Services) == 0 {
-				dereg := &consulapi.CatalogDeregistration{
-					Node: nodeName,
-				}
-				_, err = k2c.consulCatalog.Deregister(dereg, nil)
-				if err != nil {
-					glog.Errorf("Error deregistrating node %s: %v", nodeName, err)
-				} else {
-					glog.Infof("Deregister empty node %s", nodeName)
-				}
-
-			}
-		} else {
+		if node, _, err := k2c.consulCatalog.Node(nodeName, nil); err != nil {
 			glog.Errorf("Cannot get node %s: %v", nodeName, err)
+		} else if node != nil && len(node.Services) == 0 {
+			dereg := &consulapi.CatalogDeregistration{
+				Node: nodeName,
+			}
+			_, err = k2c.consulCatalog.Deregister(dereg, nil)
+			if err != nil {
+				glog.Errorf("Error deregistrating node %s: %v", nodeName, err)
+			} else {
+				glog.Infof("Deregister empty node %s", nodeName)
+			}
 		}
 	}
 }
