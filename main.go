@@ -22,7 +22,7 @@ var (
 
 const (
 	consulTag          = "kube2consul"
-	kube2consulVersion = "v1.0.0"
+	kube2consulVersion = "v1.0.1"
 )
 
 type kube2consul struct {
