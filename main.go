@@ -16,13 +16,13 @@ import (
 )
 
 var (
-	opts cliOpts
-	wg   sync.WaitGroup
+	opts               cliOpts
+	wg                 sync.WaitGroup
+	kube2consulVersion string
 )
 
 const (
-	consulTag          = "kube2consul"
-	kube2consulVersion = "v1.0.1"
+	consulTag = "kube2consul"
 )
 
 type kube2consul struct {
