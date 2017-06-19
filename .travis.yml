@@ -1,0 +1,12 @@
+sudo: false
+language: go
+go: 1.8
+deploy:
+  provider: releases
+  api_key:
+    secure: vsqff4IEI4g4cskDQ533hwQMpxCU6lJOH7MNJs3HZsNrp/VnBZSEYW/XjNSTTJtCyy1kzQ/T9H2UCnKd+shSsNk1877ybIizZGBDMYHusWeMbpbJ4+3fgS6qF/E1i9e8sGfs2tGaOElbeO6bDta+wc5N7SxReNTTNusvzh0G6AOSlae4wPCdMqgAX7n9Bc2jmjS4F5UNU08uz5TX0mMRu1d1NLYVQxcoMcQOuvxFZocbt39QSIKTek7LvkRF4sP3FrkfxhVVezy9XXcU4v1qu+xqUe7e99tJXNjj8OS8xV0YqCRgHUSCoaRqsQwsmUfSC561U6VmapErTpLCfcS6xctKn0EWlq0jq56ffVwdiaoweIpy8X185wRQIpXvYihmSs1zJ/pUGxz4kJ7p9YBXc74WvTQs5l01gDMf149HVPTuujXkxcS/QUZxxnWgy4ZdOxsioCq670CcI1Jutf4mLupaD8R94w+kD6kfDNOIUUgQoN+VZzaYNkggTeS/ac1xSHO5nfi18LCZJDjnxCbB6muvHShK0umLYWjejZaMCZ1tWSnIJXuUw5JLjjGRrDdWptMTfIJ6lge3VTo36SK0guvcAXok8xhq+lTjRSZIehzmt+WS8zG/Nn9+ChHxCEfv1nOK5xQ6NTU/WPvQyribZlsnWdCpL8XjAIF400poyeE=
+  file: bin/kube2consul
+  skip_cleanup: true
+  on:
+    repo: cloudwatt/kube2consul
+    tags: true
