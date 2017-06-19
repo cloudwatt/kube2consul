@@ -11,18 +11,18 @@ import (
 	"github.com/golang/glog"
 	consulapi "github.com/hashicorp/consul/api"
 
-	kapi "k8s.io/kubernetes/pkg/api"
-	kcache "k8s.io/kubernetes/pkg/client/cache"
+	"k8s.io/client-go/pkg/api/v1"
+	kcache "k8s.io/client-go/tools/cache"
 )
 
 var (
-	opts cliOpts
-	wg   sync.WaitGroup
+	opts               cliOpts
+	wg                 sync.WaitGroup
+	kube2consulVersion string
 )
 
 const (
-	consulTag          = "kube2consul"
-	kube2consulVersion = "v1.0.1"
+	consulTag = "kube2consul"
 )
 
 type kube2consul struct {
@@ -36,14 +36,16 @@ type cliOpts struct {
 	consulToken  string
 	resyncPeriod int
 	version      bool
+	kubeConfig   string
 }
 
 func init() {
 	flag.BoolVar(&opts.version, "version", false, "Prints kube2consul version")
 	flag.IntVar(&opts.resyncPeriod, "resync-period", 30, "Resynchronization period in second")
-	flag.StringVar(&opts.kubeAPI, "kubernetes-api", "http://127.0.0.1:8080", "Kubernetes API URL")
+	flag.StringVar(&opts.kubeAPI, "kubernetes-api", "", "Overrides apiserver address when used in cluster")
 	flag.StringVar(&opts.consulAPI, "consul-api", "127.0.0.1:8500", "Consul API URL")
 	flag.StringVar(&opts.consulToken, "consul-token", "", "Consul API token")
+	flag.StringVar(&opts.kubeConfig, "kubeconfig", "", "Absolute path to the kubeconfig file")
 }
 
 func inSlice(value string, slice []string) bool {
@@ -59,7 +61,7 @@ func (k2c *kube2consul) RemoveDNSGarbage() {
 	epSet := make(map[string]struct{})
 
 	for _, obj := range k2c.endpointsStore.List() {
-		if ep, ok := obj.(*kapi.Endpoints); ok {
+		if ep, ok := obj.(*v1.Endpoints); ok {
 			epSet[ep.Name] = struct{}{}
 		}
 	}
@@ -98,7 +100,7 @@ func main() {
 	}
 
 	// create kubernetes client
-	kubeClient, err := newKubeClient(opts.kubeAPI)
+	kubeClient, err := newKubeClient(opts.kubeAPI, opts.kubeConfig)
 	if err != nil {
 		glog.Fatalf("Failed to create a kubernetes client: %v", err)
 	}
