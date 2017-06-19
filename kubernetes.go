@@ -1,52 +1,90 @@
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 
-	kapi "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	kcache "k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/client/restclient"
-	kclient "k8s.io/kubernetes/pkg/client/unversioned"
-	kframework "k8s.io/kubernetes/pkg/controller/framework"
-	kselector "k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
+	kapi "k8s.io/client-go/pkg/api"
+	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/rest"
+	kcache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
-// Returns a cache.ListWatch that gets all changes to endpoints.
-func createEndpointsLW(kubeClient *kclient.Client) *kcache.ListWatch {
-	return kcache.NewListWatchFromClient(kubeClient, "endpoints", kapi.NamespaceAll, kselector.Everything())
-}
-
-func newKubeClient(kubeAPI string) (*kclient.Client, error) {
-	var (
-		config *restclient.Config
-	)
-
-	config = &restclient.Config{
-		Host:          kubeAPI,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}},
+func newKubeClient(apiserver string, kubeconfig string) (kubeClient kubernetes.Interface, err error) {
+	if kubeconfig == "" {
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
+		// Allow overriding of apiserver if using inClusterConfig
+		// (necessary if kube-proxy isn't properly set up).
+		if apiserver != "" {
+			config.Host = apiserver
+		}
+		tokenPresent := false
+		if len(config.BearerToken) > 0 {
+			tokenPresent = true
+		}
+		glog.Infof("service account token present: %v", tokenPresent)
+		glog.Infof("service host: %s", config.Host)
+		if kubeClient, err = kubernetes.NewForConfig(config); err != nil {
+			return nil, err
+		}
+	} else {
+		loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+		// if you want to change the loading rules (which files in which order), you can do so here
+		loadingRules.ExplicitPath = kubeconfig
+		configOverrides := &clientcmd.ConfigOverrides{}
+		// if you want to change override values or bind them to flags, there are methods to help you
+		kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+		config, err := kubeConfig.ClientConfig()
+		//config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		//config, err := clientcmd.DefaultClientConfig.ClientConfig()
+		if err != nil {
+			return nil, err
+		}
+		kubeClient, err = kubernetes.NewForConfig(config)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	glog.Infof("Using %s for kubernetes master", config.Host)
-	glog.Infof("Using kubernetes API %v", config.GroupVersion)
-	return kclient.New(config)
+	// Informers don't seem to do a good job logging error messages when it
+	// can't reach the server, making debugging hard. This makes it easier to
+	// figure out if apiserver is configured incorrectly.
+	glog.Infof("Testing communication with server")
+	_, err = kubeClient.Discovery().ServerVersion()
+	if err != nil {
+		return nil, fmt.Errorf("ERROR communicating with apiserver: %v", err)
+	}
+	glog.Infof("Communication with server successful")
+
+	return kubeClient, nil
+}
+
+// Returns a cache.ListWatch that gets all changes to endpoints.
+func createEndpointsListWatcher(kubeClient kubernetes.Interface) *kcache.ListWatch {
+	client := kubeClient.CoreV1().RESTClient()
+	return kcache.NewListWatchFromClient(client, "endpoints", kapi.NamespaceAll, nil)
 }
 
 func (k2c *kube2consul) handleEndpointUpdate(obj interface{}) {
-	if e, ok := obj.(*kapi.Endpoints); ok {
+	if e, ok := obj.(*v1.Endpoints); ok {
 		k2c.updateEndpoints(e)
 	}
 }
 
-func (k2c *kube2consul) watchEndpoints(kubeClient *kclient.Client) kcache.Store {
-	eStore, eController := kframework.NewInformer(
-		createEndpointsLW(kubeClient),
-		&kapi.Endpoints{},
+func (k2c *kube2consul) watchEndpoints(kubeClient kubernetes.Interface) kcache.Store {
+	eStore, eController := kcache.NewInformer(
+		createEndpointsListWatcher(kubeClient),
+		&v1.Endpoints{},
 		time.Duration(opts.resyncPeriod)*time.Second,
-		kframework.ResourceEventHandlerFuncs{
+		kcache.ResourceEventHandlerFuncs{
 			AddFunc: func(newObj interface{}) {
 				go k2c.handleEndpointUpdate(newObj)
 			},
@@ -55,7 +93,6 @@ func (k2c *kube2consul) watchEndpoints(kubeClient *kclient.Client) kcache.Store 
 			},
 		},
 	)
-
 	go eController.Run(wait.NeverStop)
 	return eStore
 }

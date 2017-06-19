@@ -1,6 +1,8 @@
 package main
 
-import kapi "k8s.io/kubernetes/pkg/api"
+import (
+	"k8s.io/client-go/pkg/api/v1"
+)
 
 // Endpoint is a summary of kubernetes endpoint
 type Endpoint struct {
@@ -15,7 +17,7 @@ func NewEndpoint(name, address string, port int32, refName string) Endpoint {
 	return Endpoint{name, address, port, refName}
 }
 
-func generateEntries(endpoint *kapi.Endpoints) []Endpoint {
+func generateEntries(endpoint *v1.Endpoints) []Endpoint {
 	var (
 		eps     []Endpoint
 		refName string
@@ -35,7 +37,7 @@ func generateEntries(endpoint *kapi.Endpoints) []Endpoint {
 	return eps
 }
 
-func (k2c *kube2consul) updateEndpoints(ep *kapi.Endpoints) {
+func (k2c *kube2consul) updateEndpoints(ep *v1.Endpoints) {
 	endpoints := generateEntries(ep)
 	for _, e := range endpoints {
 		k2c.registerEndpoint(e)
