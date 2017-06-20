@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/golang/glog"
 	consulapi "github.com/hashicorp/consul/api"
 )
@@ -10,7 +11,18 @@ func newConsulClient(consulAPI, consulToken string) (*consulapi.Client, error) {
 	config.Address = consulAPI
 	config.Token = consulToken
 
-	return consulapi.NewClient(config)
+	consulClient, err := consulapi.NewClient(config)
+	if err != nil {
+		return nil, err
+	}
+	glog.Infof("Testing communication with consul server")
+	_, err = consulClient.Status().Leader()
+	if err != nil {
+		return nil, fmt.Errorf("ERROR communicating with consul server: %v", err)
+	}
+	glog.Infof("Communication with consul server successful")
+
+	return consulClient, nil
 }
 
 func (k2c *kube2consul) registerEndpoint(e Endpoint) {
