@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/coreos/pkg/flagutil"
@@ -17,7 +16,6 @@ import (
 
 var (
 	opts               cliOpts
-	wg                 sync.WaitGroup
 	kube2consulVersion string
 )
 
@@ -111,16 +109,10 @@ func main() {
 
 	k2c.endpointsStore = k2c.watchEndpoints(kubeClient)
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
 		for {
 			select {
 			case <-time.NewTicker(time.Duration(opts.resyncPeriod) * time.Second).C:
 				k2c.RemoveDNSGarbage()
 			}
 		}
-	}()
-
-	wg.Wait()
 }
