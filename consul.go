@@ -15,12 +15,12 @@ func newConsulClient(consulAPI, consulToken string) (*consulapi.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	glog.Infof("Testing communication with consul server")
+	glog.V(2).Infof("Testing communication with consul server")
 	_, err = consulClient.Status().Leader()
 	if err != nil {
 		return nil, fmt.Errorf("ERROR communicating with consul server: %v", err)
 	}
-	glog.Infof("Communication with consul server successful")
+	glog.V(2).Infof("Communication with consul server successful")
 
 	return consulClient, nil
 }
