@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/coreos/pkg/flagutil"
@@ -17,6 +19,8 @@ import (
 var (
 	opts               cliOpts
 	kube2consulVersion string
+	lock               *consulapi.Lock
+	lockCh             <-chan struct{}
 )
 
 const (
@@ -35,6 +39,8 @@ type cliOpts struct {
 	resyncPeriod int
 	version      bool
 	kubeConfig   string
+	lock         bool
+	lockKey      string
 }
 
 func init() {
@@ -44,6 +50,8 @@ func init() {
 	flag.StringVar(&opts.consulAPI, "consul-api", "127.0.0.1:8500", "Consul API URL")
 	flag.StringVar(&opts.consulToken, "consul-token", "", "Consul API token")
 	flag.StringVar(&opts.kubeConfig, "kubeconfig", "", "Absolute path to the kubeconfig file")
+	flag.BoolVar(&opts.lock, "lock", false, "Acquires a lock with consul to ensure that only one instance of kube2consul is running")
+	flag.StringVar(&opts.lockKey, "lock-key", "locks/kube2consul/.lock", "Key used for locking")
 }
 
 func inSlice(value string, slice []string) bool {
@@ -103,16 +111,57 @@ func main() {
 		glog.Fatalf("Failed to create a kubernetes client: %v", err)
 	}
 
+	if opts.lock {
+		glog.Info("Attempting to acquire lock")
+		lock, err = consulClient.LockKey(opts.lockKey)
+		if err != nil {
+			glog.Fatalf("Lock setup failed :%v", err)
+		}
+		stopCh := make(chan struct{})
+		lockCh, err = lock.Lock(stopCh)
+		if err != nil {
+			glog.Fatalf("Failed acquiring lock: %v", err)
+		}
+		glog.Info("Lock acquired")
+	}
 	k2c := kube2consul{
 		consulCatalog: consulClient.Catalog(),
 	}
 
 	k2c.endpointsStore = k2c.watchEndpoints(kubeClient)
 
-		for {
-			select {
-			case <-time.NewTicker(time.Duration(opts.resyncPeriod) * time.Second).C:
-				k2c.RemoveDNSGarbage()
+	// Handle SIGINT and SIGTERM.
+	sigs := make(chan os.Signal)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	for {
+		select {
+		case <-time.NewTicker(time.Duration(opts.resyncPeriod) * time.Second).C:
+			k2c.RemoveDNSGarbage()
+		case <-lockCh:
+			glog.Fatalf("Lost lock, Exting")
+		case sig := <-sigs:
+			glog.Infof("Recieved signal: %v", sig)
+			if opts.lock {
+				glog.Infof("Attempting to release lock")
+				if err := lock.Unlock(); err != nil {
+					glog.Errorf("Lock release failed : %s", err)
+					os.Exit(1)
+				}
+				glog.Infof("Lock released")
+				glog.Infof("Cleaning lock entry")
+				if err := lock.Destroy(); err != nil {
+					if err != consulapi.ErrLockInUse {
+						glog.Errorf("Lock cleanup failed: %s", err)
+						os.Exit(1)
+					} else {
+						glog.Infof("Cleanup aborted, lock in use")
+					}
+				}
+				glog.Infof("Cleanup succeeded")
+				glog.Infof("Exiting")
+				os.Exit(0)
 			}
 		}
+	}
 }
