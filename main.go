@@ -184,12 +184,14 @@ func main() {
 		case sig := <-sigs:
 			glog.Infof("Recieved signal: %v", sig)
 			if opts.lock {
+				// Release the lock before termination
 				glog.Infof("Attempting to release lock")
 				if err := lock.Unlock(); err != nil {
 					glog.Errorf("Lock release failed : %s", err)
 					os.Exit(1)
 				}
 				glog.Infof("Lock released")
+				// Cleanup the lock if no longer in use
 				glog.Infof("Cleaning lock entry")
 				if err := lock.Destroy(); err != nil {
 					if err != consulapi.ErrLockInUse {
@@ -198,8 +200,9 @@ func main() {
 					} else {
 						glog.Infof("Cleanup aborted, lock in use")
 					}
+				} else {
+					glog.Infof("Cleanup succeeded")
 				}
-				glog.Infof("Cleanup succeeded")
 				glog.Infof("Exiting")
 			}
 			os.Exit(0)

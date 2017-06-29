@@ -30,8 +30,8 @@ func newKubeClient(apiserver string, kubeconfig string) (kubeClient kubernetes.I
 		if len(config.BearerToken) > 0 {
 			tokenPresent = true
 		}
-		glog.Infof("service account token present: %v", tokenPresent)
-		glog.Infof("service host: %s", config.Host)
+		glog.V(2).Infof("service account token present: %v", tokenPresent)
+		glog.V(2).Infof("service host: %s", config.Host)
 		if kubeClient, err = kubernetes.NewForConfig(config); err != nil {
 			return nil, err
 		}
