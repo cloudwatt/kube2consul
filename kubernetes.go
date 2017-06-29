@@ -57,13 +57,10 @@ func newKubeClient(apiserver string, kubeconfig string) (kubeClient kubernetes.I
 	// Informers don't seem to do a good job logging error messages when it
 	// can't reach the server, making debugging hard. This makes it easier to
 	// figure out if apiserver is configured incorrectly.
-	glog.V(2).Infof("Testing communication with k8s apiserver")
 	_, err = kubeClient.Discovery().ServerVersion()
 	if err != nil {
 		return nil, fmt.Errorf("ERROR communicating with k8s apiserver: %v", err)
 	}
-	glog.V(2).Infof("Communication with k8s apiserver successful")
-
 	return kubeClient, nil
 }
 
@@ -75,7 +72,9 @@ func createEndpointsListWatcher(kubeClient kubernetes.Interface) *kcache.ListWat
 
 func (k2c *kube2consul) handleEndpointUpdate(obj interface{}) {
 	if e, ok := obj.(*v1.Endpoints); ok {
-		k2c.updateEndpoints(e)
+		if err := k2c.updateEndpoints(e); err != nil {
+			glog.Errorf("Error handling update event: %v", err)
+		}
 	}
 }
 
