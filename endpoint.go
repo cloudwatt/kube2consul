@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"k8s.io/client-go/pkg/api/v1"
 )
 
@@ -37,11 +38,15 @@ func generateEntries(endpoint *v1.Endpoints) []Endpoint {
 	return eps
 }
 
-func (k2c *kube2consul) updateEndpoints(ep *v1.Endpoints) {
+func (k2c *kube2consul) updateEndpoints(ep *v1.Endpoints) error {
 	endpoints := generateEntries(ep)
 	for _, e := range endpoints {
-		k2c.registerEndpoint(e)
+		if err := k2c.registerEndpoint(e); err != nil {
+			return fmt.Errorf("Error updating endpoints %v: %v", ep.Name, err)
+		}
 	}
-
-	k2c.removeDeletedEndpoints(ep.Name, endpoints)
+	if err := k2c.removeDeletedEndpoints(ep.Name, endpoints); err != nil {
+		return fmt.Errorf("Error removing possible deleted endpoints: %v", err)
+	}
+	return nil
 }

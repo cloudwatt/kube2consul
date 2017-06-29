@@ -92,7 +92,10 @@ func (k2c *kube2consul) RemoveDNSGarbage() {
 		}
 
 		if _, ok := epSet[name]; !ok {
-			k2c.removeDeletedEndpoints(name, []Endpoint{})
+			err = k2c.removeDeletedEndpoints(name, []Endpoint{})
+			if err != nil {
+				glog.Errorf("Error removing DNS garbage: %v", err)
+			}
 		}
 	}
 }
@@ -116,7 +119,10 @@ func kubernetesCheck() error {
 func main() {
 	// parse flags
 	flag.Parse()
-	flagutil.SetFlagsFromEnv(flag.CommandLine, "K2C")
+	err := flagutil.SetFlagsFromEnv(flag.CommandLine, "K2C")
+	if err != nil {
+		glog.Fatalf("Cannot set flags from env: %v", err)
+	}
 
 	if opts.version {
 		fmt.Println(kube2consulVersion)
