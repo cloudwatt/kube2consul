@@ -29,10 +29,6 @@ var (
 	lockCh             <-chan struct{}
 )
 
-const (
-	consulTag = "kube2consul"
-)
-
 type kube2consul struct {
 	consulCatalog  *consulapi.Catalog
 	endpointsStore kcache.Store
@@ -48,6 +44,7 @@ type cliOpts struct {
 	lock         bool
 	lockKey      string
 	noHealth     bool
+	consulTag    string
 }
 
 func init() {
@@ -60,6 +57,7 @@ func init() {
 	flag.BoolVar(&opts.lock, "lock", false, "Acquires a lock with consul to ensure that only one instance of kube2consul is running")
 	flag.StringVar(&opts.lockKey, "lock-key", "locks/kube2consul/.lock", "Key used for locking")
 	flag.BoolVar(&opts.noHealth, "no-health", false, "Disable endpoint /health on port 8080")
+	flag.StringVar(&opts.consulTag, "consul-tag", "kube2consul", "Tag setted on services to identify services managed by kube2consul in Consul")
 }
 
 func inSlice(value string, slice []string) bool {
@@ -87,7 +85,7 @@ func (k2c *kube2consul) RemoveDNSGarbage() {
 	}
 
 	for name, tags := range services {
-		if !inSlice(consulTag, tags) {
+		if !inSlice(opts.consulTag, tags) {
 			continue
 		}
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/golang/glog"
 	consulapi "github.com/hashicorp/consul/api"
 )
@@ -27,7 +28,7 @@ func (k2c *kube2consul) registerEndpoint(e Endpoint) error {
 		return nil
 	}
 
-	consulServices, _, err := k2c.consulCatalog.Service(e.Name, consulTag, nil)
+	consulServices, _, err := k2c.consulCatalog.Service(e.Name, opts.consulTag, nil)
 	if err != nil {
 		return fmt.Errorf("Failed to get services: %v", err)
 	}
@@ -41,7 +42,7 @@ func (k2c *kube2consul) registerEndpoint(e Endpoint) error {
 	service := &consulapi.AgentService{
 		Service: e.Name,
 		Port:    int(e.Port),
-		Tags:    []string{consulTag},
+		Tags:    []string{opts.consulTag},
 	}
 
 	reg := &consulapi.CatalogRegistration{
@@ -70,7 +71,7 @@ func endpointExists(refName, address string, port int, endpoints []Endpoint) boo
 
 func (k2c *kube2consul) removeDeletedEndpoints(serviceName string, endpoints []Endpoint) error {
 	updatedNodes := make(map[string]struct{})
-	services, _, err := k2c.consulCatalog.Service(serviceName, consulTag, nil)
+	services, _, err := k2c.consulCatalog.Service(serviceName, opts.consulTag, nil)
 	if err != nil {
 		return fmt.Errorf("Failed to get services: %v", err)
 	}
