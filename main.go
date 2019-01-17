@@ -32,6 +32,7 @@ var (
 type kube2consul struct {
 	consulCatalog  *consulapi.Catalog
 	endpointsStore kcache.Store
+	servicesStore  kcache.Store
 }
 
 type cliOpts struct {
@@ -174,6 +175,7 @@ func main() {
 	}
 
 	k2c.endpointsStore = k2c.watchEndpoints(kubeClient)
+	k2c.servicesStore = k2c.watchServices(kubeClient)
 
 	// Handle SIGINT and SIGTERM.
 	sigs := make(chan os.Signal)

@@ -24,6 +24,7 @@ func newConsulClient(consulAPI, consulToken string) (*consulapi.Client, error) {
 }
 
 func (k2c *kube2consul) registerEndpoint(e Endpoint) error {
+	glog.V(2).Infof("Register endpoint %+v", e)
 	if e.RefName == "" {
 		return nil
 	}
