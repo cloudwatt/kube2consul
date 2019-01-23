@@ -95,3 +95,34 @@ func (k2c *kube2consul) watchEndpoints(kubeClient kubernetes.Interface) kcache.S
 	go eController.Run(wait.NeverStop)
 	return eStore
 }
+
+func createServicesListWatcher(kubeClient kubernetes.Interface) *kcache.ListWatch {
+	client := kubeClient.CoreV1().RESTClient()
+	return kcache.NewListWatchFromClient(client, "services", kapi.NamespaceAll, nil)
+}
+
+func (k2c *kube2consul) handleServiceUpdate(obj interface{}) {
+	if s, ok := obj.(*v1.Service); ok {
+		if err := k2c.updateService(s); err != nil {
+			glog.Errorf("Error handling update event: %v", err)
+		}
+	}
+}
+
+func (k2c *kube2consul) watchServices(kubeClient kubernetes.Interface) kcache.Store {
+	eStore, eController := kcache.NewInformer(
+		createServicesListWatcher(kubeClient),
+		&v1.Service{},
+		time.Duration(opts.resyncPeriod)*time.Second,
+		kcache.ResourceEventHandlerFuncs{
+			AddFunc: func(newObj interface{}) {
+				go k2c.handleServiceUpdate(newObj)
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				go k2c.handleServiceUpdate(newObj)
+			},
+		},
+	)
+	go eController.Run(wait.NeverStop)
+	return eStore
+}
